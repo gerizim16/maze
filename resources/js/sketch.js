@@ -167,6 +167,7 @@ function maze(sketch) {
     const colors = {
         darkGreen: [38, 70, 83],
         yellow: [233, 196, 106],
+        orange: [244, 162, 97],
         red: [231, 111, 81],
         bluegreen: [42, 157, 143],
         white: 220,
@@ -266,7 +267,6 @@ function maze(sketch) {
             }
             pathWaysIndex += pathWaysIndexInc;
         }
-
         sketch.pop();
 
         sketch.stroke(colors.white);
@@ -283,6 +283,7 @@ function maze(sketch) {
 
     sketch.windowResized = function () {
         sketch.resizeCanvas(sketch.windowWidth, sketch.windowHeight);
+        reset();
     }
 }
 
