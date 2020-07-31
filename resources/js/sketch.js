@@ -127,11 +127,11 @@ function triangulate(points, maxEdgeLength = null) {
         if (e > delaunay.halfedges[e]) {
             const p = points[delaunay.triangles[e]];
             const q = points[delaunay.triangles[nextHalfedge(e)]];
-            p.adjacents = p.adjacents ?? new Set();
-            q.adjacents = q.adjacents ?? new Set();
-            p.adjacents.add(q);
-            q.adjacents.add(p);
             if (maxEdgeLength == null || dist(p.x, p.y, q.x, q.y) < maxEdgeLength) {
+                p.adjacents = p.adjacents ?? new Set();
+                q.adjacents = q.adjacents ?? new Set();
+                p.adjacents.add(q);
+                q.adjacents.add(p);
                 edges.push([p, q]);
             }
         }
