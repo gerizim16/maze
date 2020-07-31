@@ -179,7 +179,7 @@ function maze(sketch) {
         radiusSlider = sketch.createSlider(10, 100, 30, 5);
         radiusSlider.position(20, 20);
         radiusSlider.style('width', '200px');
-        
+
         sketch.textSize(20);
         reset()
     };
@@ -190,15 +190,17 @@ function maze(sketch) {
         }
 
         sketch.push();
-        sketch.stroke(231, 111, 81);
-        sketch.strokeWeight(4);
         if (pointsIndex < points.length) {
+            sketch.stroke(231, 111, 81);
+            sketch.strokeWeight(8);
             for (let i = pointsIndex; i < Math.min(pointsIndexInc + pointsIndex, points.length); i++) {
                 const point = points[i];
                 sketch.point(point.x, point.y);
             }
             pointsIndex += pointsIndexInc;
         } else if (edgesIndex < edges.length) {
+            sketch.stroke(38, 70, 83);
+            sketch.strokeWeight(2);
             for (let i = edgesIndex; i < Math.min(edgesIndex + edgesIndexInc, edges.length); i++) {
                 const edge = edges[i];
                 sketch.line(edge[0].x, edge[0].y, edge[1].x, edge[1].y);
