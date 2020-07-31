@@ -209,6 +209,9 @@ function maze(sketch) {
         }
 
         sketch.pop();
+
+        sketch.stroke(240);
+        sketch.strokeWeight(10);
         sketch.text('radius', 240, 37);
     };
 
