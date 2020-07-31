@@ -225,8 +225,8 @@ function maze(sketch) {
         radiusSlider.position(20, 20);
         radiusSlider.style('width', '200px');
 
-        strokeWeightSlider = sketch.createSlider(1, 40, 18, 1);
-        strokeWeightSlider.position(20, 40);
+        strokeWeightSlider = sketch.createSlider(1, 40, 15, 1);
+        strokeWeightSlider.position(20, 45);
         strokeWeightSlider.style('width', '200px');
 
         sketch.textSize(20);
@@ -270,9 +270,9 @@ function maze(sketch) {
         sketch.pop();
 
         sketch.stroke(colors.white);
-        sketch.strokeWeight(7);
+        sketch.strokeWeight(4);
         sketch.text('radius', 240, 37);
-        sketch.text('stroke width', 240, 57);
+        sketch.text('stroke width', 240, 62);
     };
 
     sketch.keyPressed = function () {
