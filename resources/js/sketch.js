@@ -110,7 +110,7 @@ function createGraph(cells) {
             grid[y][x].adjacents = grid[y][x].adjacents ?? new Set();
             // for each neigbor of the cell
             for (let yNeighbor = Math.max(0, y - radius); yNeighbor <= Math.min(cells.height - 1, y + radius); yNeighbor++) {
-                for (let xNeighbor = Math.max(0, x - radius); xNeighbor <= Math.min(cells.height - 1, x + radius); xNeighbor++) {
+                for (let xNeighbor = Math.max(0, x - radius); xNeighbor <= Math.min(cells.width - 1, x + radius); xNeighbor++) {
                     if (!grid[yNeighbor][xNeighbor] || (yNeighbor == y && xNeighbor == x)) continue;
                     grid[y][x].adjacents.add(grid[yNeighbor][xNeighbor]);
                     // add edge to edges
@@ -137,7 +137,7 @@ function maze(sketch) {
         sketch.createCanvas(800, 800);
         sketch.background(240);
 
-        radius = 20;
+        radius = 50;
         const returnObject = poissonDiskSampling(radius, sketch.width, sketch.height);
         [points, cells] = [returnObject.points, returnObject.cells];
         edges = createGraph(cells);
