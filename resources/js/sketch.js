@@ -127,6 +127,10 @@ function triangulate(points, maxEdgeLength = null) {
         if (e > delaunay.halfedges[e]) {
             const p = points[delaunay.triangles[e]];
             const q = points[delaunay.triangles[nextHalfedge(e)]];
+            p.adjacents = p.adjacents ?? new Set();
+            q.adjacents = q.adjacents ?? new Set();
+            p.adjacents.add(q);
+            q.adjacents.add(p);
             if (maxEdgeLength == null || dist(p.x, p.y, q.x, q.y) < maxEdgeLength) {
                 edges.push([p, q]);
             }
@@ -136,15 +140,43 @@ function triangulate(points, maxEdgeLength = null) {
     return edges;
 }
 
-function createMaze() {
+
+// uses Aldous-Broder algorithm
+function createMaze(points) {
+    let pathWays = [];
+    let currentPoint = points[getRandomInt(points.length)];
+    currentPoint.visited = true;
+
+    while (points.some(point => !point.visited)) {
+        const neighPoint = Array.from(currentPoint.adjacents)[getRandomInt(currentPoint.adjacents.size)];
+        if (!neighPoint.visited) {
+            pathWays.push([currentPoint, neighPoint]);
+            currentPoint.pathWays = currentPoint.pathWays ?? new Set();
+            currentPoint.pathWays.add(neighPoint);
+            neighPoint.pathWays = neighPoint.pathWays ?? new Set();
+            neighPoint.pathWays.add(currentPoint);
+            neighPoint.visited = true;
+        }
+        currentPoint = neighPoint;
+    }
+
+    return pathWays;
 }
 
 function maze(sketch) {
-    let points, edges, cells;
-    let pointsIndex, edgesIndex;
-    let pointsIndexInc, edgesIndexInc;
-    let radius;
-    let radiusSlider;
+    const colors = {
+        darkGreen: [38, 70, 83],
+        yellow: [233, 196, 106],
+        red: [231, 111, 81],
+        bluegreen: [42, 157, 143],
+        white: 220,
+    }
+
+    let points, edges, cells, pathWays;
+    let pointsIndex, edgesIndex, pathWaysIndex;
+    let pointsIndexInc, edgesIndexInc, pathWaysIndexInc;
+    let radius, radiusSlider;
+    let strokeWeightSlider;
 
     function sliderChanged(slider) {
         if (slider.oldValue != slider.value()) {
@@ -154,18 +186,30 @@ function maze(sketch) {
         return false;
     }
 
-    function reset() {
-        sketch.background(240);
-        radius = radiusSlider.value();
+    function redraw() {
+        sketch.background(colors.darkGreen);
         pointsIndex = 0;
         edgesIndex = 0;
+        pathWaysIndex = 0;
+    }
+
+    function updateMaze() {
+        radius = radiusSlider.value();
+
         const returnObject = poissonDiskSampling(radius, sketch.width, sketch.height);
         [points, cells] = [returnObject.points, returnObject.cells];
         edges = triangulate(points, 3 * radius);
         shuffle(edges);
+        pathWays = createMaze(points);
 
         pointsIndexInc = Math.floor(points.length * 0.05);
         edgesIndexInc = Math.floor(edges.length * 0.08);
+        pathWaysIndexInc = Math.floor(pathWays.length * 0.05);
+    }
+
+    function reset() {
+        updateMaze();
+        redraw();
     }
 
     sketch.preload = function () {
@@ -180,6 +224,10 @@ function maze(sketch) {
         radiusSlider.position(20, 20);
         radiusSlider.style('width', '200px');
 
+        strokeWeightSlider = sketch.createSlider(1, 40, 18, 1);
+        strokeWeightSlider.position(20, 40);
+        strokeWeightSlider.style('width', '200px');
+
         sketch.textSize(20);
         reset()
     };
@@ -188,10 +236,13 @@ function maze(sketch) {
         if (sliderChanged(radiusSlider)) {
             reset();
         }
+        if (sliderChanged(strokeWeightSlider)) {
+            redraw();
+        }
 
         sketch.push();
         if (pointsIndex < points.length) {
-            sketch.stroke(231, 111, 81);
+            sketch.stroke(colors.red);
             sketch.strokeWeight(8);
             for (let i = pointsIndex; i < Math.min(pointsIndexInc + pointsIndex, points.length); i++) {
                 const point = points[i];
@@ -199,20 +250,29 @@ function maze(sketch) {
             }
             pointsIndex += pointsIndexInc;
         } else if (edgesIndex < edges.length) {
-            sketch.stroke(38, 70, 83);
+            sketch.stroke(colors.red);
             sketch.strokeWeight(2);
             for (let i = edgesIndex; i < Math.min(edgesIndex + edgesIndexInc, edges.length); i++) {
                 const edge = edges[i];
                 sketch.line(edge[0].x, edge[0].y, edge[1].x, edge[1].y);
             }
             edgesIndex += edgesIndexInc;
+        } else if (pathWaysIndex < pathWays.length) {
+            sketch.stroke(colors.white);
+            sketch.strokeWeight(strokeWeightSlider.value());
+            for (let i = pathWaysIndex; i < Math.min(pathWaysIndex + pathWaysIndexInc, pathWays.length); i++) {
+                const pathWay = pathWays[i];
+                sketch.line(pathWay[0].x, pathWay[0].y, pathWay[1].x, pathWay[1].y);
+            }
+            pathWaysIndex += pathWaysIndexInc;
         }
 
         sketch.pop();
 
-        sketch.stroke(240);
-        sketch.strokeWeight(10);
+        sketch.stroke(colors.white);
+        sketch.strokeWeight(7);
         sketch.text('radius', 240, 37);
+        sketch.text('stroke width', 240, 57);
     };
 
     sketch.keyPressed = function () {
