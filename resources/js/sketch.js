@@ -1,3 +1,23 @@
+function dist(ax, ay, bx, by) {
+    return Math.hypot(ax - bx, ay - by);
+}
+
+function shuffle(array) {
+    let currentIndex = array.length, temporaryValue, randomIndex;
+
+    while (0 !== currentIndex) {
+
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex -= 1;
+
+        temporaryValue = array[currentIndex];
+        array[currentIndex] = array[randomIndex];
+        array[randomIndex] = temporaryValue;
+    }
+
+    return array;
+}
+
 function getRandomInt(min, max) {
     if (max == null) {
         max = min;
@@ -45,7 +65,7 @@ function poissonDiskSampling(radius, width, height, k = 30) {
                 // if point exists
                 if (this.grid[y][x] != null) {
                     // if distance between adjacent point is < radius, return false
-                    if (Math.hypot(this.grid[y][x].x - point.x, this.grid[y][x].y - point.y) < radius) {
+                    if (dist(this.grid[y][x].x, this.grid[y][x].y, point.x, point.y) < radius) {
                         return false;
                     }
                 }
@@ -98,27 +118,17 @@ function poissonDiskSampling(radius, width, height, k = 30) {
     return { points: points, cells: cells };
 }
 
-function createGraph(cells) {
-    const radius = 1;
+function triangulate(points, maxEdgeLength = null) {
     let edges = [];
-    let grid = cells.grid;
 
-    // for each cell
-    for (let y = 0; y < cells.height; y++) {
-        for (let x = 0; x < cells.width; x++) {
-            if (!grid[y][x]) continue;
-            grid[y][x].adjacents = grid[y][x].adjacents ?? new Set();
-            // for each neigbor of the cell
-            for (let yNeighbor = Math.max(0, y - radius); yNeighbor <= Math.min(cells.height - 1, y + radius); yNeighbor++) {
-                for (let xNeighbor = Math.max(0, x - radius); xNeighbor <= Math.min(cells.width - 1, x + radius); xNeighbor++) {
-                    if (!grid[yNeighbor][xNeighbor] || (yNeighbor == y && xNeighbor == x)) continue;
-                    grid[y][x].adjacents.add(grid[yNeighbor][xNeighbor]);
-                    // add edge to edges
-                    if (grid[yNeighbor][xNeighbor].adjacents &&
-                        grid[yNeighbor][xNeighbor].adjacents.has(grid[y][x])) {
-                        edges.push([grid[y][x], grid[yNeighbor][xNeighbor]]);
-                    }
-                }
+    function nextHalfedge(e) { return (e % 3 === 2) ? e - 2 : e + 1; }
+    const delaunay = Delaunator.from(points, point => point.x, point => point.y);
+    for (let e = 0; e < delaunay.triangles.length; e++) {
+        if (e > delaunay.halfedges[e]) {
+            const p = points[delaunay.triangles[e]];
+            const q = points[delaunay.triangles[nextHalfedge(e)]];
+            if (maxEdgeLength == null || dist(p.x, p.y, q.x, q.y) < maxEdgeLength) {
+                edges.push([p, q]);
             }
         }
     }
@@ -126,9 +136,37 @@ function createGraph(cells) {
     return edges;
 }
 
+function createMaze() {
+}
+
 function maze(sketch) {
     let points, edges, cells;
+    let pointsIndex, edgesIndex;
+    let pointsIndexInc, edgesIndexInc;
     let radius;
+    let radiusSlider;
+
+    function sliderChanged(slider) {
+        if (slider.oldValue != slider.value()) {
+            slider.oldValue = slider.value();
+            return true;
+        }
+        return false;
+    }
+
+    function reset() {
+        sketch.background(240);
+        radius = radiusSlider.value();
+        pointsIndex = 0;
+        edgesIndex = 0;
+        const returnObject = poissonDiskSampling(radius, sketch.width, sketch.height);
+        [points, cells] = [returnObject.points, returnObject.cells];
+        edges = triangulate(points, 3 * radius);
+        shuffle(edges);
+
+        pointsIndexInc = Math.floor(points.length * 0.05);
+        edgesIndexInc = Math.floor(edges.length * 0.08);
+    }
 
     sketch.preload = function () {
     };
@@ -136,37 +174,40 @@ function maze(sketch) {
     sketch.setup = function () {
         let canvas = sketch.createCanvas(sketch.windowWidth, sketch.windowHeight);
         canvas.style('display', 'block');
-        sketch.background(240);
+        sketch.frameRate(30);
 
-        radius = 50;
-        const returnObject = poissonDiskSampling(radius, sketch.width, sketch.height);
-        [points, cells] = [returnObject.points, returnObject.cells];
-        edges = createGraph(cells);
+        radiusSlider = sketch.createSlider(10, 100, 30, 5);
+        radiusSlider.position(20, 20);
+        radiusSlider.style('width', '200px');
+        
+        sketch.textSize(20);
+        reset()
     };
 
     sketch.draw = function () {
-        // sketch.stroke(0);
-        // sketch.strokeWeight(1);
-        // for (let x = 0; x < sketch.width; x += Math.floor(radius / Math.sqrt(2))) {
-        //     sketch.line(x, 0, x, sketch.height);
-        // }
-        // for (let y = 0; y < sketch.height; y += Math.floor(radius / Math.sqrt(2))) {
-        //     sketch.line(0, y, sketch.width, y);
-        // }
-
-        sketch.stroke(0, 0, 255);
-        sketch.strokeWeight(4);
-        for (const edge of edges) {
-            sketch.line(edge[0].x, edge[0].y, edge[1].x, edge[1].y);
+        if (sliderChanged(radiusSlider)) {
+            reset();
         }
 
-        sketch.stroke(255, 0, 0);
+        sketch.push();
+        sketch.stroke(231, 111, 81);
         sketch.strokeWeight(4);
-        for (const point of points) {
-            sketch.point(point.x, point.y);
+        if (pointsIndex < points.length) {
+            for (let i = pointsIndex; i < Math.min(pointsIndexInc + pointsIndex, points.length); i++) {
+                const point = points[i];
+                sketch.point(point.x, point.y);
+            }
+            pointsIndex += pointsIndexInc;
+        } else if (edgesIndex < edges.length) {
+            for (let i = edgesIndex; i < Math.min(edgesIndex + edgesIndexInc, edges.length); i++) {
+                const edge = edges[i];
+                sketch.line(edge[0].x, edge[0].y, edge[1].x, edge[1].y);
+            }
+            edgesIndex += edgesIndexInc;
         }
 
-        sketch.noLoop();
+        sketch.pop();
+        sketch.text('radius', 240, 37);
     };
 
     sketch.keyPressed = function () {
@@ -176,7 +217,7 @@ function maze(sketch) {
     };
 
     sketch.windowResized = function () {
-        sketch.resizeCanvas(windowWidth, windowHeight);
+        sketch.resizeCanvas(sketch.windowWidth, sketch.windowHeight);
     }
 }
 
