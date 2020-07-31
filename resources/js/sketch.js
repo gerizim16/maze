@@ -134,7 +134,8 @@ function maze(sketch) {
     };
 
     sketch.setup = function () {
-        sketch.createCanvas(800, 800);
+        let canvas = sketch.createCanvas(sketch.windowWidth, sketch.windowHeight);
+        canvas.style('display', 'block');
         sketch.background(240);
 
         radius = 50;
@@ -173,6 +174,10 @@ function maze(sketch) {
 
     sketch.keyReleased = function () {
     };
+
+    sketch.windowResized = function () {
+        sketch.resizeCanvas(windowWidth, windowHeight);
+    }
 }
 
 let p5Sketch = new p5(maze, 'gameContainer');
