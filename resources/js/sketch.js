@@ -2,6 +2,12 @@ function dist(ax, ay, bx, by) {
     return Math.hypot(ax - bx, ay - by);
 }
 
+function difference(setA, setB) {
+    let _difference = new Set(setA);
+    for (let elem of setB) _difference.delete(elem);
+    return _difference;
+}
+
 function shuffle(array) {
     let currentIndex = array.length, temporaryValue, randomIndex;
 
@@ -140,6 +146,12 @@ function triangulate(points, maxEdgeLength = null) {
     return edges;
 }
 
+function createPathWay(pointA, pointB) {
+    pointA.pathWays = pointA.pathWays ?? new Set();
+    pointA.pathWays.add(pointB);
+    pointB.pathWays = pointB.pathWays ?? new Set();
+    pointB.pathWays.add(pointA);
+}
 
 // uses Aldous-Broder algorithm
 function createMaze(points) {
@@ -151,16 +163,81 @@ function createMaze(points) {
         const neighPoint = Array.from(currentPoint.adjacents)[getRandomInt(currentPoint.adjacents.size)];
         if (!neighPoint.visited) {
             pathWays.push([currentPoint, neighPoint]);
-            currentPoint.pathWays = currentPoint.pathWays ?? new Set();
-            currentPoint.pathWays.add(neighPoint);
-            neighPoint.pathWays = neighPoint.pathWays ?? new Set();
-            neighPoint.pathWays.add(currentPoint);
+            createPathWay(currentPoint, neighPoint);
             neighPoint.visited = true;
         }
         currentPoint = neighPoint;
     }
 
     return pathWays;
+}
+
+function addRandomPathways(points, n = 1, maxTries = 20) {
+    let pathWays = [];
+    outer: for (let i = 0; i < n; i++) {
+        let candidates = new Set();
+        let point;
+        let tries = 0;
+        while (candidates.size == 0) {
+            point = points[getRandomInt(points.length)];
+            candidates = difference(point.adjacents, point.pathWays);
+            if (tries++ == maxTries) break outer;
+        }
+        const neighPoint = Array.from(candidates)[getRandomInt(candidates.size)];
+        pathWays.push([point, neighPoint]);
+        createPathWay(point, neighPoint);
+    }
+    return pathWays;
+}
+
+function aStar(start, goal) {
+    function reconstructPath(current) {
+        let totalPath = [current,];
+        let from;
+        while (from = cameFrom.get(current)) {
+            current = from;
+            totalPath.push(current);
+        }
+        return totalPath.reverse();
+    }
+    function hScore(node) {
+        return dist(goal.x, goal.y, node.x, node.y);
+    }
+    function weight(from, to) {
+        return dist(from.x, from.y, to.x, to.y);
+    }
+    let openSet = new PriorityQueue((a, b) => a.priority < b.priority);
+    let cameFrom = new Map();
+    let gScore = new Map();
+    gScore.set(start, 0);
+    let fScore = new Map();
+    fScore.set(start, hScore(start));
+    let visited = new Set();
+    visited.add(start);
+
+    openSet.push(start, fScore.get(start));
+    while (openSet.size != 0) {
+        const currNode = openSet.pop();
+        if (currNode === goal) {
+            return reconstructPath(currNode);
+        }
+        for (const neighbor of currNode.pathWays) {
+            const tempGScore = gScore.get(currNode) + weight(currNode, neighbor);
+            if (!visited.has(neighbor) || tempGScore < gScore.get(neighbor)) {
+                visited.add(neighbor);
+                cameFrom.set(neighbor, currNode);
+                gScore.set(neighbor, tempGScore);
+                fScore.set(neighbor, tempGScore + hScore(neighbor));
+                if (!visited.has(neighbor)) {
+                    openSet.push(neighbor, fScore.get(neighbor));
+                } else {
+                    openSet.remove(neighbor);
+                    openSet.push(neighbor, fScore.get(neighbor));
+                }
+            }
+        }
+    }
+    return [];
 }
 
 function maze(sketch) {
@@ -178,6 +255,8 @@ function maze(sketch) {
     let pointsIndexInc, edgesIndexInc, pathWaysIndexInc;
     let radius, radiusSlider;
     let strokeWeightSlider;
+    let difficultySlider;
+    let solution, solutionLines;
 
     function sliderChanged(slider) {
         if (slider.oldValue != slider.value()) {
@@ -195,17 +274,48 @@ function maze(sketch) {
     }
 
     function updateMaze() {
+        const difficulty = 0.1 - difficultySlider.value();
         radius = radiusSlider.value();
 
+        // sample points
         const returnObject = poissonDiskSampling(radius, sketch.width, sketch.height);
         [points, cells] = [returnObject.points, returnObject.cells];
+        // triangulate
         edges = triangulate(points, 3 * radius);
         shuffle(edges);
+        // create the maze
         pathWays = createMaze(points);
+        pathWays = pathWays.concat(addRandomPathways(points, edges.length * difficulty));
 
-        pointsIndexInc = Math.floor(points.length * 0.05);
-        edgesIndexInc = Math.floor(edges.length * 0.08);
-        pathWaysIndexInc = Math.floor(pathWays.length * 0.05);
+        // solve
+        let start;
+        start: for (let i = 0; i < cells.width; i++) {
+            for (let j = cells.height - 1; j >= 0; j--) {
+                if (cells.grid[j][i]) {
+                    start = cells.grid[j][i];
+                    break start;
+                }
+            }
+        }
+        let end;
+        end: for (let i = cells.width - 1; i >= 0; i--) {
+            for (let j = 0; j < cells.height; j++) {
+                if (cells.grid[j][i]) {
+                    end = cells.grid[j][i];
+                    break end;
+                }
+            }
+        }
+        solution = aStar(start, end);
+        solutionLines = [];
+        for (let i = 0; i < solution.length - 1; i++) {
+            solutionLines.push([solution[i], solution[i + 1]]);
+        }
+
+        // set animation speeds
+        pointsIndexInc = Math.max(1, Math.floor(points.length * 0.05));
+        edgesIndexInc = Math.max(1, Math.floor(edges.length * 0.08));
+        pathWaysIndexInc = Math.max(1, Math.floor(pathWays.length * 0.05));
     }
 
     function reset() {
@@ -229,16 +339,17 @@ function maze(sketch) {
         strokeWeightSlider.position(20, 45);
         strokeWeightSlider.style('width', '200px');
 
+        difficultySlider = sketch.createSlider(0, 0.1, 0.1, 0.05);
+        difficultySlider.position(20, 70);
+        difficultySlider.style('width', '200px');
+
         sketch.textSize(20);
         reset()
     };
 
     sketch.draw = function () {
-        if (sliderChanged(radiusSlider)) {
+        if (sliderChanged(radiusSlider) || sliderChanged(difficultySlider)) {
             reset();
-        }
-        if (sliderChanged(strokeWeightSlider)) {
-            redraw();
         }
 
         sketch.push();
@@ -266,6 +377,17 @@ function maze(sketch) {
                 sketch.line(pathWay[0].x, pathWay[0].y, pathWay[1].x, pathWay[1].y);
             }
             pathWaysIndex += pathWaysIndexInc;
+        } else {
+            sketch.background(colors.darkGreen);
+            sketch.stroke(colors.white);
+            sketch.strokeWeight(strokeWeightSlider.value());
+            for (const pathWay of pathWays) {
+                sketch.line(pathWay[0].x, pathWay[0].y, pathWay[1].x, pathWay[1].y);
+            }
+            sketch.stroke(colors.red);
+            for (const line of solutionLines) {
+                sketch.line(line[0].x, line[0].y, line[1].x, line[1].y);
+            }
         }
         sketch.pop();
 
@@ -273,6 +395,7 @@ function maze(sketch) {
         sketch.strokeWeight(4);
         sketch.text('radius', 240, 37);
         sketch.text('stroke width', 240, 62);
+        sketch.text('difficulty', 240, 87);
     };
 
     sketch.keyPressed = function () {
