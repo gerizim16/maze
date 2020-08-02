@@ -252,7 +252,7 @@ function maze(sketch) {
         bluegreen: [42, 157, 143],
         white: 220,
     }
-    
+
     const maxDifficulty = 0.2;
     let points, edges, cells, pathWays;
     let pointsIndex, edgesIndex, pathWaysIndex;
@@ -361,11 +361,11 @@ function maze(sketch) {
         canvas.style('display', 'block');
         sketch.frameRate(30);
 
-        radiusSlider = sketch.createSlider(10, 100, 80, 5);
+        radiusSlider = sketch.createSlider(10, 100, 55, 5);
         radiusSlider.position(20, 20);
         radiusSlider.style('width', '200px');
 
-        strokeWeightSlider = sketch.createSlider(1, 40, 30, 1);
+        strokeWeightSlider = sketch.createSlider(1, 40, 15, 1);
         strokeWeightSlider.position(20, 45);
         strokeWeightSlider.style('width', '200px');
 
@@ -463,7 +463,7 @@ function maze(sketch) {
         sketch.text('stroke width', 240, 62);
         sketch.text('difficulty', 240, 87);
         sketch.textAlign(sketch.RIGHT);
-        sketch.text('click or tap on the maze to select start and goal points', sketch.width - 30, 37);
+        sketch.text('click or tap on the maze to\nselect start and goal points', sketch.width - 30, sketch.height - 50);
     };
 
     sketch.mouseClicked = function () {
