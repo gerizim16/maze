@@ -252,7 +252,8 @@ function maze(sketch) {
         bluegreen: [42, 157, 143],
         white: 220,
     }
-
+    
+    const maxDifficulty = 0.2;
     let points, edges, cells, pathWays;
     let pointsIndex, edgesIndex, pathWaysIndex;
     let pointsIndexInc, edgesIndexInc, pathWaysIndexInc;
@@ -328,7 +329,7 @@ function maze(sketch) {
 
     function updateMaze() {
         resetAStar();
-        const difficulty = 0.1 - difficultySlider.value();
+        const difficulty = maxDifficulty - difficultySlider.value();
         radius = radiusSlider.value();
 
         // sample points
@@ -360,15 +361,15 @@ function maze(sketch) {
         canvas.style('display', 'block');
         sketch.frameRate(30);
 
-        radiusSlider = sketch.createSlider(10, 100, 30, 5);
+        radiusSlider = sketch.createSlider(10, 100, 80, 5);
         radiusSlider.position(20, 20);
         radiusSlider.style('width', '200px');
 
-        strokeWeightSlider = sketch.createSlider(1, 40, 15, 1);
+        strokeWeightSlider = sketch.createSlider(1, 40, 30, 1);
         strokeWeightSlider.position(20, 45);
         strokeWeightSlider.style('width', '200px');
 
-        difficultySlider = sketch.createSlider(0, 0.1, 0.1, 0.05);
+        difficultySlider = sketch.createSlider(0, maxDifficulty, maxDifficulty, 0.05);
         difficultySlider.position(20, 70);
         difficultySlider.style('width', '200px');
 
@@ -495,7 +496,6 @@ function maze(sketch) {
                 solveAStar();
             }
         }
-        console.log(start, goal);
     }
 
     sketch.keyPressed = function () {
