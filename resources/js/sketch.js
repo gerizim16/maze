@@ -369,7 +369,7 @@ function maze(sketch) {
         strokeWeightSlider.position(20, 45);
         strokeWeightSlider.style('width', '200px');
 
-        difficultySlider = sketch.createSlider(0, maxDifficulty, maxDifficulty, 0.05);
+        difficultySlider = sketch.createSlider(0, maxDifficulty, 0, 0.05);
         difficultySlider.position(20, 70);
         difficultySlider.style('width', '200px');
 
