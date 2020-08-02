@@ -457,9 +457,12 @@ function maze(sketch) {
 
         sketch.stroke(colors.white);
         sketch.strokeWeight(4);
+        sketch.textAlign(sketch.LEFT);
         sketch.text('radius', 240, 37);
         sketch.text('stroke width', 240, 62);
         sketch.text('difficulty', 240, 87);
+        sketch.textAlign(sketch.RIGHT);
+        sketch.text('click or tap on the maze to select start and goal points', sketch.width - 30, 37);
     };
 
     sketch.mouseClicked = function () {
