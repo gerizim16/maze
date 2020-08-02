@@ -190,28 +190,31 @@ function addRandomPathways(points, n = 1, maxTries = 20) {
     return pathWays;
 }
 
+function reconstructPath(current, cameFrom) {
+    let totalPath = [current,];
+    let from;
+    while (from = cameFrom.get(current)) {
+        current = from;
+        totalPath.push(current);
+    }
+    return totalPath.reverse();
+}
+
+function hScore(node, goal) {
+    return dist(goal.x, goal.y, node.x, node.y);
+}
+
+function weight(from, to) {
+    return dist(from.x, from.y, to.x, to.y);
+}
+
 function aStar(start, goal) {
-    function reconstructPath(current) {
-        let totalPath = [current,];
-        let from;
-        while (from = cameFrom.get(current)) {
-            current = from;
-            totalPath.push(current);
-        }
-        return totalPath.reverse();
-    }
-    function hScore(node) {
-        return dist(goal.x, goal.y, node.x, node.y);
-    }
-    function weight(from, to) {
-        return dist(from.x, from.y, to.x, to.y);
-    }
     let openSet = new PriorityQueue((a, b) => a.priority < b.priority);
     let cameFrom = new Map();
     let gScore = new Map();
     gScore.set(start, 0);
     let fScore = new Map();
-    fScore.set(start, hScore(start));
+    fScore.set(start, hScore(start, goal));
     let visited = new Set();
     visited.add(start);
 
@@ -219,7 +222,7 @@ function aStar(start, goal) {
     while (openSet.size != 0) {
         const currNode = openSet.pop();
         if (currNode === goal) {
-            return reconstructPath(currNode);
+            return reconstructPath(currNode, cameFrom);
         }
         for (const neighbor of currNode.pathWays) {
             const tempGScore = gScore.get(currNode) + weight(currNode, neighbor);
@@ -227,7 +230,7 @@ function aStar(start, goal) {
                 visited.add(neighbor);
                 cameFrom.set(neighbor, currNode);
                 gScore.set(neighbor, tempGScore);
-                fScore.set(neighbor, tempGScore + hScore(neighbor));
+                fScore.set(neighbor, tempGScore + hScore(neighbor, goal));
                 if (!visited.has(neighbor)) {
                     openSet.push(neighbor, fScore.get(neighbor));
                 } else {
@@ -256,7 +259,9 @@ function maze(sketch) {
     let radius, radiusSlider;
     let strokeWeightSlider;
     let difficultySlider;
-    let solution, solutionLines;
+    let solution;
+    let start, goal;
+    let solve, solved, aStarVars;
 
     function sliderChanged(slider) {
         if (slider.oldValue != slider.value()) {
@@ -273,7 +278,56 @@ function maze(sketch) {
         pathWaysIndex = 0;
     }
 
+    function resetAStar() {
+        start = null; goal = null;
+        solve = false; solved = false;
+    }
+
+    function solveAStar() {
+        solve = true;
+        aStarVars = {
+            openSet: new PriorityQueue((a, b) => a.priority < b.priority),
+            closedSet: [],
+            cameFrom: new Map(),
+            gScore: new Map(),
+            fScore: new Map(),
+            visited: new Set(),
+        }
+        aStarVars.gScore.set(start, 0);
+        aStarVars.fScore.set(start, hScore(start, goal));
+        aStarVars.visited.add(start);
+        aStarVars.openSet.push(start, aStarVars.fScore.get(start));
+    }
+
+    function drawPoints(pointArray, color, weight) {
+        sketch.push();
+        sketch.stroke(color);
+        sketch.strokeWeight(weight);
+        for (const point of pointArray) {
+            sketch.point(point.x, point.y);
+        }
+        sketch.pop();
+    }
+
+    function drawPath(path, color, weight) {
+        sketch.push();
+        sketch.noFill();
+        sketch.stroke(color);
+        sketch.strokeWeight(weight);
+        sketch.beginShape();
+        for (const point of path) {
+            sketch.vertex(point.x, point.y);
+        }
+        sketch.endShape();
+        sketch.pop();
+    }
+
+    function drawPathTo(point, color, weight) {
+        drawPath(reconstructPath(point, aStarVars.cameFrom), color, weight);
+    }
+
     function updateMaze() {
+        resetAStar();
         const difficulty = 0.1 - difficultySlider.value();
         radius = radiusSlider.value();
 
@@ -286,31 +340,6 @@ function maze(sketch) {
         // create the maze
         pathWays = createMaze(points);
         pathWays = pathWays.concat(addRandomPathways(points, edges.length * difficulty));
-
-        // solve
-        let start;
-        start: for (let i = 0; i < cells.width; i++) {
-            for (let j = cells.height - 1; j >= 0; j--) {
-                if (cells.grid[j][i]) {
-                    start = cells.grid[j][i];
-                    break start;
-                }
-            }
-        }
-        let end;
-        end: for (let i = cells.width - 1; i >= 0; i--) {
-            for (let j = 0; j < cells.height; j++) {
-                if (cells.grid[j][i]) {
-                    end = cells.grid[j][i];
-                    break end;
-                }
-            }
-        }
-        solution = aStar(start, end);
-        solutionLines = [];
-        for (let i = 0; i < solution.length - 1; i++) {
-            solutionLines.push([solution[i], solution[i + 1]]);
-        }
 
         // set animation speeds
         pointsIndexInc = Math.max(1, Math.floor(points.length * 0.05));
@@ -345,6 +374,8 @@ function maze(sketch) {
 
         sketch.textSize(20);
         reset()
+
+        sketch.strokeJoin(sketch.ROUND);
     };
 
     sketch.draw = function () {
@@ -384,10 +415,43 @@ function maze(sketch) {
             for (const pathWay of pathWays) {
                 sketch.line(pathWay[0].x, pathWay[0].y, pathWay[1].x, pathWay[1].y);
             }
-            sketch.stroke(colors.red);
-            for (const line of solutionLines) {
-                sketch.line(line[0].x, line[0].y, line[1].x, line[1].y);
+        }
+
+        if (solve) {
+            if (aStarVars.openSet.size != 0) {
+                const currNode = aStarVars.openSet.pop();
+                aStarVars.closedSet.push(currNode);
+                if (currNode === goal) {
+                    solution = reconstructPath(goal, aStarVars.cameFrom);
+                    solve = false;
+                    solved = true;
+                } else {
+                    for (const neighbor of currNode.pathWays) {
+                        const tempGScore = aStarVars.gScore.get(currNode) + weight(currNode, neighbor);
+                        if (!aStarVars.visited.has(neighbor) || tempGScore < aStarVars.gScore.get(neighbor)) {
+                            aStarVars.visited.add(neighbor);
+                            aStarVars.cameFrom.set(neighbor, currNode);
+                            aStarVars.gScore.set(neighbor, tempGScore);
+                            aStarVars.fScore.set(neighbor, tempGScore + hScore(neighbor, goal));
+                            if (!aStarVars.visited.has(neighbor)) {
+                                aStarVars.openSet.push(neighbor, aStarVars.fScore.get(neighbor));
+                            } else {
+                                aStarVars.openSet.remove(neighbor);
+                                aStarVars.openSet.push(neighbor, aStarVars.fScore.get(neighbor));
+                            }
+                        }
+                    }
+                }
+                drawPoints(aStarVars.openSet.elements, 10, strokeWeightSlider.value());
+                drawPoints(aStarVars.closedSet, 100, strokeWeightSlider.value());
+                drawPoints([start, goal], colors.bluegreen, strokeWeightSlider.value() * 2);
+                drawPathTo(currNode, colors.orange, Math.max(1, strokeWeightSlider.value() * 0.5));
+            } else {
+                solved = true;
+                solve = false;
             }
+        } else if (solved) {
+            drawPath(solution, colors.red, strokeWeightSlider.value() * 0.8);
         }
         sketch.pop();
 
@@ -397,6 +461,39 @@ function maze(sketch) {
         sketch.text('stroke width', 240, 62);
         sketch.text('difficulty', 240, 87);
     };
+
+    sketch.mouseClicked = function () {
+        const pointIndex = cells.getIndex({ x: sketch.mouseX, y: sketch.mouseY });
+        let pointCandidates = [];
+        for (let y = Math.max(0, pointIndex.y - 1); y <= Math.min(cells.height - 1, pointIndex.y + 1); y++) {
+            for (let x = Math.max(0, pointIndex.x - 1); x <= Math.min(cells.width - 1, pointIndex.x + 1); x++) {
+                const tempPoint = cells.grid[y][x];
+                if (tempPoint != null) {
+                    pointCandidates.push(tempPoint);
+                }
+            }
+        }
+        if (pointCandidates.length != 0) {
+            let point = pointCandidates[0];
+            let candidateDist;
+            let minDist = dist(point.x, point.y, sketch.mouseX, sketch.mouseY);
+            for (const candidate of pointCandidates) {
+                candidateDist = dist(candidate.x, candidate.y, sketch.mouseX, sketch.mouseY);
+                if (candidateDist < minDist) {
+                    point = candidate;
+                    minDist = candidateDist;
+                }
+            }
+            if (goal == null) {
+                goal = point;
+            } else {
+                start = goal;
+                goal = point;
+                solveAStar();
+            }
+        }
+        console.log(start, goal);
+    }
 
     sketch.keyPressed = function () {
     };
